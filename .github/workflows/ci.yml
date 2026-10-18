@@ -1,0 +1,76 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+jobs:
+  build:
+    name: Build luks-volume-key-hash
+    runs-on: ${{ matrix.artifact.os }}
+    env:
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - os: ubuntu-latest
+            name: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            name: aarch64-unknown-linux-gnu
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # For git describe
+          fetch-depth: 0
+          submodules: true
+
+      - name: Install cryptsetup dev package
+        run: |
+          sudo apt-get update
+          sudo apt-get install libcryptsetup-dev
+
+      - name: Update Rust
+        run: rustup update stable
+
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          echo -n 'version=' >> "${GITHUB_OUTPUT}"
+          git describe --always \
+              | sed -E "s/^v//g;s/([^-]*-g)/r\1/;s/-/./g" \
+              >> "${GITHUB_OUTPUT}"
+
+      - name: Install toolchains
+        shell: bash
+        run: |
+          rustup target add "${{ matrix.artifact.name }}"
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Clippy
+        shell: bash
+        run: |
+          cargo clippy --release --target "${{ matrix.artifact.name }}"
+
+      - name: Formatting
+        run: cargo fmt -- --check
+
+      - name: Build
+        shell: bash
+        run: |
+          cargo build --release --target "${{ matrix.artifact.name }}"
+
+      - name: Create output directory
+        shell: bash
+        run: |
+          rm -rf target/output
+          ln -s "${{ matrix.artifact.name }}/release" target/output
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: luks-volume-key-hash-${{ steps.get_version.outputs.version }}-${{ matrix.artifact.name }}
+          path: target/output/luks-volume-key-hash

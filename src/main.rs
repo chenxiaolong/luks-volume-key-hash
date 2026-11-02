@@ -4,11 +4,11 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::Parser;
 use hmac::{Hmac, KeyInit, Mac};
 use libcryptsetup_rs::CryptInit;
 use sha2::Sha256;
 use uuid::Uuid;
+use winnow_args::Args;
 use zeroize::Zeroizing;
 
 const HEX: [char; 16] = [
@@ -17,7 +17,7 @@ const HEX: [char; 16] = [
 
 /// Compute the LUKS volume key hash for use with systemd's fixate-volume-key
 /// crypttab option.
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 pub struct Cli {
     /// The device-mapper name used when attaching the device.
     ///
@@ -26,6 +26,7 @@ pub struct Cli {
     name: Option<String>,
 
     /// LUKS block device or file image.
+    #[arg(positional)]
     path: PathBuf,
 }
 
